@@ -1,8 +1,9 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-import openai
 import uvicorn
 import os
+from openai import OpenAI
 
+client = OpenAI() # Initialize OpenAI Client
 app = FastAPI()
 
 openai.api_key = 'sk-proj-bKmMrLvoLMlazLgYwbIsT3BlbkFJxZpw40MFZntiEXZJqHuj'
@@ -16,17 +17,17 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI
-        response = openai.File.create(
+        response = client.beta.file.create(
             file=open(file_location, "rb"),
             purpose='assistants'
         )
         file_id = response['id']
 
         # Create a thread
-        thread = openai.Thread.create()
+        thread = client.beta.threads.create()
 
         # Add a message with the image
-        message = openai.Message.create(
+        message = client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content="Please identify the result of this lateral flow test.",
@@ -34,13 +35,13 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
         )
 
         # Run the assistant
-        run = openai.Run.create(
+        run = client.beta.threads.runs.create(
             thread_id=thread.id,
             assistant_id='asst_zLWEETO02q3El9LXec4PfNJi'
         )
 
         # Retrieve the messages in the thread
-        messages = openai.Message.list(
+        messages = client.beta.threads.messages.(
             thread_id=thread.id
         )
 
