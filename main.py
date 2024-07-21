@@ -50,7 +50,7 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
         assistant = client.beta.assistants.create(
             name="Lateral Flow Test Identifier",
             description="You are an assistant that helps to identify lateral flow test results.",
-            model="gpt-4-turbo",
+            model="gpt-4o",
             tools=[{"type": "file_search"}, {"type": "code_interpreter"}]
         )
 
