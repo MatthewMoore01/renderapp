@@ -3,7 +3,7 @@ import uvicorn
 import os
 from openai import OpenAI
 
-client = OpenAI(api_key='sk-proj-bKmMrLvoLMlazLgYwbIsT3BlbkFJxZpw40MFZntiEXZJqHuj')
+client = OpenAI(api_key='sk-proj-NGAHyytT56hGztWpYsTuT3BlbkFJOTiE9Wgr0wKlr35RJcsu')
 
 # Initialize the FastAPI app
 app = FastAPI()
