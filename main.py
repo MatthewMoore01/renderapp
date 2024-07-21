@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 import os
-from openai import OpenAI
+import openai
 
-client = OpenAI() # Initialize OpenAI Client
+# Initialize the FastAPI app
 app = FastAPI()
 
+# Set your OpenAI API key from an environment variable for security
 openai.api_key = 'sk-proj-bKmMrLvoLMlazLgYwbIsT3BlbkFJxZpw40MFZntiEXZJqHuj'
 
 @app.post("/identify-lateral-flow-test/")
@@ -17,33 +18,32 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI
-        response = client.beta.file.create(
+        response = openai.File.create(
             file=open(file_location, "rb"),
-            purpose='assistants'
+            purpose='answers'
         )
         file_id = response['id']
 
-        # Create a thread
-        thread = client.beta.threads.create()
+        # Create a thread (if this is needed by your specific OpenAI API use case)
+        thread_response = openai.Thread.create()
+        thread_id = thread_response['id']
 
         # Add a message with the image
-        message = client.beta.threads.messages.create(
-            thread_id=thread.id,
+        message_response = openai.Message.create(
+            thread_id=thread_id,
             role="user",
             content="Please identify the result of this lateral flow test.",
             file_ids=[file_id]
         )
 
         # Run the assistant
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
+        run_response = openai.Thread.run(
+            thread_id=thread_id,
             assistant_id='asst_zLWEETO02q3El9LXec4PfNJi'
         )
 
         # Retrieve the messages in the thread
-        messages = client.beta.threads.messages.(
-            thread_id=thread.id
-        )
+        messages = openai.Message.list(thread_id=thread_id)
 
         # Find the assistant's response
         result = ""
