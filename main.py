@@ -1,7 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 import os
-from openai import OpenAI
+from openai import OpenAI, AssistantEventHandler
+from typing_extensions import override
 
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
@@ -11,70 +12,73 @@ app = FastAPI()
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
     try:
+
+        class EventHandler(AssistantEventHandler):
+            @override
+            def on_text_created(self, text) -> None:
+                print(f"\nassistant > ", end="", flush=True)
+
+            @override
+            def on_text_delta(self, delta, snapshot):
+                print(delta.value, end="", flush=True)
+
+            def on_tool_call_created(self, tool_call):
+                print(f"\nassistant > {tool_call.type}\n", flush=True)
+
+            def on_tool_call_delta(self, delta, snapshot):
+                if delta.type == 'code_interpreter':
+                    if delta.code_interpreter.input:
+                        print(delta.code_interpreter.input, end="", flush=True)
+                    if delta.code_interpreter.outputs:
+                        print(f"\n\noutput >", flush=True)
+                        for output in delta.code_interpreter.outputs:
+                            if output.type == "logs":
+                                print(f"\n{output.logs}", flush=True)
+
         # Save the uploaded file
         file_location = f"/tmp/{file.filename}"
         with open(file_location, "wb") as f:
             f.write(await file.read())
 
         # Upload the file to OpenAI with the correct purpose
-        uploaded_file_response = client.files.create(
+        uploaded_file = client.files.create(
             file=open(file_location, "rb"),
             purpose='vision'
         )
-        uploaded_file_id = uploaded_file_response.get("id")
-
-        if not uploaded_file_id:
-            raise Exception("Failed to upload file to OpenAI")
 
         # Create an assistant
         assistant = client.beta.assistants.create(
-            model="gpt-4-turbo",
-            instructions="You are an assistant that helps to identify lateral flow test results.",
             name="Lateral Flow Test Identifier",
-            tools=[{"type": "file_search"}],
-            tool_resources={"file_ids": [uploaded_file_id]}
+            description="You are an assistant that helps to identify lateral flow test results.",
+            model="gpt-4-turbo",
+            tools=[{"type": "file_search"}, {"type": "code_interpreter"}]
         )
-        assistant_id = assistant.get("id")
-
-        if not assistant_id:
-            raise Exception("Failed to create assistant")
 
         # Create a thread and run it with the assistant
-        stream = client.beta.threads.create_and_run(
-            assistant_id=assistant_id,
-            thread={
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "Please identify the result of this lateral flow test."
-                            },
-                            {
-                                "type": "image_file",
-                                "image_file": {"file_id": uploaded_file_id}
-                            }
-                        ]
-                    }
-                ]
-            },
-            stream=True
+        thread = client.beta.threads.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Please identify the result of this lateral flow test."
+                        },
+                        {
+                            "type": "image_file",
+                            "image_file": {"file_id": uploaded_file.id}
+                        }
+                    ]
+                }
+            ]
         )
 
-        # Collect the assistant's response
-        result = ""
-        for event in stream:
-            if event["object"] == "thread.message.delta":
-                deltas = event["delta"]["content"]
-                for delta in deltas:
-                    if delta["type"] == "text":
-                        result += delta["text"]["value"]
-
-        # Clean up the saved file
-        os.remove(file_location)
-
-        return {"result": result}
+        with client.beta.threads.runs.stream(
+                thread_id=thread.id,
+                assistant_id=assistant.id,
+                event_handler=EventHandler(),
+        ) as stream:
+            stream.until_done()
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
