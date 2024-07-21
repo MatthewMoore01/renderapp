@@ -1,13 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 import os
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Initialize the FastAPI app
 app = FastAPI()
 
 # Set your OpenAI API key from an environment variable for security
-openai.api_key = os.getenv('OPENAI_API_KEY')
 
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
@@ -18,23 +19,19 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI with the correct purpose
-        response = openai.File.create(
-            file=open(file_location, "rb"),
-            purpose='assistants'
-        )
-        file_id = response['id']
+        response = client.files.create(file=open(file_location, "rb"),
+        purpose='assistants')
+        file_id = response.id
 
         # Create a message with the image
-        message = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an assistant that helps to identify lateral flow test results."},
-                {"role": "user", "content": "Please identify the result of this lateral flow test.", "files": [file_id]}
-            ]
-        )
+        message = client.chat.completions.create(model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are an assistant that helps to identify lateral flow test results."},
+            {"role": "user", "content": "Please identify the result of this lateral flow test.", "files": [file_id]}
+        ])
 
         # Find the assistant's response
-        result = message.choices[0].message['content']
+        result = message.choices[0].message.content
 
         # Clean up the saved file
         os.remove(file_location)
