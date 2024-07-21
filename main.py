@@ -12,34 +12,31 @@ app = FastAPI()
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
     try:
+        result = {"result": ""}
 
         class EventHandler(AssistantEventHandler):
-            def __init__(self):
-                self.result = ""
-                super().__init__()
-
             @override
             def on_text_created(self, text) -> None:
-                self.result += "\nassistant > "
+                print(f"\nassistant > ", end="", flush=True)
+                result["result"] = text
 
             @override
             def on_text_delta(self, delta, snapshot):
-                self.result += delta.value
+                print(delta.value, end="", flush=True)
+                result["result"] = delta.value
 
             def on_tool_call_created(self, tool_call):
-                self.result += f"\nassistant > {tool_call.type}\n"
+                print(f"\nassistant > {tool_call.type}\n", flush=True)
 
             def on_tool_call_delta(self, delta, snapshot):
                 if delta.type == 'code_interpreter':
                     if delta.code_interpreter.input:
-                        self.result += delta.code_interpreter.input
+                        print(delta.code_interpreter.input, end="", flush=True)
                     if delta.code_interpreter.outputs:
-                        self.result += f"\n\noutput >"
+                        print(f"\n\noutput >", flush=True)
                         for output in delta.code_interpreter.outputs:
                             if output.type == "logs":
-                                self.result += f"\n{output.logs}"
-
-        event_handler = EventHandler()
+                                print(f"\n{output.logs}", flush=True)
 
         # Save the uploaded file
         file_location = f"/tmp/{file.filename}"
@@ -71,17 +68,17 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             ]
         )
 
-        # Run the thread with event handling
-        client.beta.threads.runs.stream(
-            thread_id=thread.id,
-            assistant_id='asst_zLWEETO02q3El9LXec4PfNJi',
-            event_handler=event_handler,
-        ).until_done()
+        with client.beta.threads.runs.stream(
+                thread_id=thread.id,
+                assistant_id='asst_zLWEETO02q3El9LXec4PfNJi',
+                event_handler=EventHandler(),
+        ) as stream:
+            stream.until_done()
 
         # Clean up the saved file
         os.remove(file_location)
 
-        return {"result": event_handler.result}
+        return {"result": result}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
