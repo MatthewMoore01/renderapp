@@ -2,4 +2,3 @@ fastapi
 uvicorn
 openai
 typing_extensions
-os
