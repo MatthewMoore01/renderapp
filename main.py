@@ -1,16 +1,13 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 import os
-from openai import OpenAI
-
+import openai
 
 # Initialize the FastAPI app
 app = FastAPI()
 
-apikey = os.environ.get('OPENAI_API_KEY')
-
 # Set your OpenAI API key from an environment variable for security
-client = OpenAI(api_key=apikey)
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
@@ -20,38 +17,24 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
         with open(file_location, "wb") as f:
             f.write(await file.read())
 
-        # Upload the file to OpenAI
-        response = client.files.create(file=open(file_location, "rb"),
-        purpose='answers')
-        file_id = response.id
-
-        # Create a thread (if this is needed by your specific OpenAI API use case)
-        thread_response = openai.Thread.create()
-        thread_id = thread_response['id']
-
-        # Add a message with the image
-        message_response = openai.Message.create(
-            thread_id=thread_id,
-            role="user",
-            content="Please identify the result of this lateral flow test.",
-            file_ids=[file_id]
+        # Upload the file to OpenAI with the correct purpose
+        response = openai.File.create(
+            file=open(file_location, "rb"),
+            purpose='assistants'
         )
+        file_id = response['id']
 
-        # Run the assistant
-        run_response = openai.Thread.run(
-            thread_id=thread_id,
-            assistant_id='asst_zLWEETO02q3El9LXec4PfNJi'
+        # Create a message with the image
+        message = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are an assistant that helps to identify lateral flow test results."},
+                {"role": "user", "content": "Please identify the result of this lateral flow test.", "files": [file_id]}
+            ]
         )
-
-        # Retrieve the messages in the thread
-        messages = openai.Message.list(thread_id=thread_id)
 
         # Find the assistant's response
-        result = ""
-        for msg in messages['data']:
-            if msg['role'] == 'assistant':
-                result = msg['content']
-                break
+        result = message.choices[0].message['content']
 
         # Clean up the saved file
         os.remove(file_location)
