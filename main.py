@@ -17,10 +17,14 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI with the correct purpose
-        uploaded_file = client.files.create(
+        uploaded_file_response = client.files.create(
             file=open(file_location, "rb"),
             purpose='vision'
         )
+        uploaded_file_id = uploaded_file_response.get("id")
+
+        if not uploaded_file_id:
+            raise Exception("Failed to upload file to OpenAI")
 
         # Create an assistant
         assistant = client.beta.assistants.create(
@@ -28,12 +32,16 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             instructions="You are an assistant that helps to identify lateral flow test results.",
             name="Lateral Flow Test Identifier",
             tools=[{"type": "file_search"}],
-            tool_resources={"file_ids": [uploaded_file["id"]]}
+            tool_resources={"file_ids": [uploaded_file_id]}
         )
+        assistant_id = assistant.get("id")
+
+        if not assistant_id:
+            raise Exception("Failed to create assistant")
 
         # Create a thread and run it with the assistant
         stream = client.beta.threads.create_and_run(
-            assistant_id=assistant["id"],
+            assistant_id=assistant_id,
             thread={
                 "messages": [
                     {
@@ -45,7 +53,7 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
                             },
                             {
                                 "type": "image_file",
-                                "image_file": {"file_id": uploaded_file["id"]}
+                                "image_file": {"file_id": uploaded_file_id}
                             }
                         ]
                     }
