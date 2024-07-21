@@ -27,7 +27,15 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
         message = client.chat.completions.create(model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are an assistant that helps to identify lateral flow test results."},
-            {"role": "user", "content": "Please identify the result of this lateral flow test.", "files": [file_id]}
+            {
+                "role": "user",
+                "content": "Please identify the result of this lateral flow test.",
+                "attachments": [
+                    {
+                        "file_id": file_id
+                    }
+                ]
+            }
         ])
 
         # Find the assistant's response
