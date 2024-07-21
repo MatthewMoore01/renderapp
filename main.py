@@ -8,8 +8,6 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 # Initialize the FastAPI app
 app = FastAPI()
 
-# Set your OpenAI API key from an environment variable for security
-
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
     try:
@@ -19,35 +17,51 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI with the correct purpose
-        file = client.files.create(
+        uploaded_file = client.files.create(
             file=open(file_location, "rb"),
             purpose='vision'
-                                   )
+        )
 
-        # Create a message with the image
-        message = client.chat.completions.create(model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an assistant that helps to identify lateral flow test results."
-             },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "Please identify the result of this lateral flow test."
-                    },
-                    {
-                        "type": "image_file",
-                        "image_file": {"file_id": file.id}
-                    },
-                ],
-            }
-        ])
+        # Create an assistant
+        assistant = client.beta.assistants.create(
+            model="gpt-4-turbo",
+            instructions="You are an assistant that helps to identify lateral flow test results.",
+            name="Lateral Flow Test Identifier",
+            tools=[{"type": "file_search"}],
+            tool_resources={"file_ids": [uploaded_file["id"]]}
+        )
 
-        # Find the assistant's response
-        result = message.choices[0].message.content
+        # Create a thread and run it with the assistant
+        stream = client.beta.threads.create_and_run(
+            assistant_id=assistant["id"],
+            thread={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Please identify the result of this lateral flow test."
+                            },
+                            {
+                                "type": "image_file",
+                                "image_file": {"file_id": uploaded_file["id"]}
+                            }
+                        ]
+                    }
+                ]
+            },
+            stream=True
+        )
+
+        # Collect the assistant's response
+        result = ""
+        for event in stream:
+            if event["object"] == "thread.message.delta":
+                deltas = event["delta"]["content"]
+                for delta in deltas:
+                    if delta["type"] == "text":
+                        result += delta["text"]["value"]
 
         # Clean up the saved file
         os.remove(file_location)
