@@ -2,13 +2,16 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 import os
 from openai import OpenAI
+from dotenv import load_dotenv
 
-client = OpenAI(api_key='sk-proj-NGAHyytT56hGztWpYsTuT3BlbkFJOTiE9Wgr0wKlr35RJcsu')
+# Load environment variables from the .env file
+load_dotenv()
 
 # Initialize the FastAPI app
 app = FastAPI()
 
 # Set your OpenAI API key from an environment variable for security
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
