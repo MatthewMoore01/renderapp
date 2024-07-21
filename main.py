@@ -14,26 +14,31 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
     try:
 
         class EventHandler(AssistantEventHandler):
+            def __init__(self):
+                self.result = ""
+
             @override
             def on_text_created(self, text) -> None:
-                print(f"\nassistant > ", end="", flush=True)
+                self.result += "\nassistant > "
 
             @override
             def on_text_delta(self, delta, snapshot):
-                print(delta.value, end="", flush=True)
+                self.result += delta.value
 
             def on_tool_call_created(self, tool_call):
-                print(f"\nassistant > {tool_call.type}\n", flush=True)
+                self.result += f"\nassistant > {tool_call.type}\n"
 
             def on_tool_call_delta(self, delta, snapshot):
                 if delta.type == 'code_interpreter':
                     if delta.code_interpreter.input:
-                        print(delta.code_interpreter.input, end="", flush=True)
+                        self.result += delta.code_interpreter.input
                     if delta.code_interpreter.outputs:
-                        print(f"\n\noutput >", flush=True)
+                        self.result += f"\n\noutput >"
                         for output in delta.code_interpreter.outputs:
                             if output.type == "logs":
-                                print(f"\n{output.logs}", flush=True)
+                                self.result += f"\n{output.logs}"
+
+        event_handler = EventHandler()
 
         # Save the uploaded file
         file_location = f"/tmp/{file.filename}"
@@ -46,15 +51,7 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             purpose='vision'
         )
 
-        # Create an assistant
-        assistant = client.beta.assistants.create(
-            name="Lateral Flow Test Identifier",
-            description="You are an assistant that helps to identify lateral flow test results.",
-            model="gpt-4o",
-            tools=[{"type": "file_search"}, {"type": "code_interpreter"}]
-        )
-
-        # Create a thread and run it with the assistant
+        # Create a thread
         thread = client.beta.threads.create(
             messages=[
                 {
@@ -75,10 +72,15 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
 
         with client.beta.threads.runs.stream(
                 thread_id=thread.id,
-                assistant_id=assistant.id,
-                event_handler=EventHandler(),
+                assistant_id='asst_zLWEETO02q3El9LXec4PfNJi',
+                event_handler=event_handler,
         ) as stream:
             stream.until_done()
+
+        # Clean up the saved file
+        os.remove(file_location)
+
+        return {"result": event_handler.result}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
