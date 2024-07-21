@@ -20,21 +20,28 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
 
         # Upload the file to OpenAI with the correct purpose
         response = client.files.create(file=open(file_location, "rb"),
-        purpose='assistants')
+        purpose='vision')
         file_id = response.id
 
         # Create a message with the image
-        message = client.chat.completions.create(model="gpt-3.5-turbo",
+        message = client.chat.completions.create(model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "You are an assistant that helps to identify lateral flow test results."},
+            {
+                "role": "system",
+                "content": "You are an assistant that helps to identify lateral flow test results."
+             },
             {
                 "role": "user",
-                "content": "Please identify the result of this lateral flow test.",
-                "attachments": [
+                "content": [
                     {
-                        "file_id": file_id
-                    }
-                ]
+                        "type": "text",
+                        "text": "Please identify the result of this lateral flow test."
+                    },
+                    {
+                          "type": "image_file",
+                          "image_file": {"file_id": file.id}
+                    },
+                ],
             }
         ])
 
