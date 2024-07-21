@@ -11,7 +11,7 @@ load_dotenv()
 app = FastAPI()
 
 # Set your OpenAI API key from an environment variable for security
-openai.api_key = os.getenv('OPENAI_API_KEY')
+OpenAI.api_key = os.getenv('OPENAI_API_KEY')
 
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
