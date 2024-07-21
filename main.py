@@ -19,9 +19,10 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI with the correct purpose
-        response = client.files.create(file=open(file_location, "rb"),
-        purpose='vision')
-        file_id = response.id
+        file = client.files.create(
+            file=open(file_location, "rb"),
+            purpose='vision'
+                                   )
 
         # Create a message with the image
         message = client.chat.completions.create(model="gpt-4o-mini",
@@ -38,8 +39,8 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
                         "text": "Please identify the result of this lateral flow test."
                     },
                     {
-                          "type": "image_file",
-                          "image_file": {"file_id": file.id}
+                        "type": "image_file",
+                        "image_file": {"file_id": file.id}
                     },
                 ],
             }
