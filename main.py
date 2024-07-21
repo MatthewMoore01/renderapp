@@ -78,7 +78,7 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
         # Clean up the saved file
         os.remove(file_location)
 
-        return {"result": result}
+        return {"result": result["result"]}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
