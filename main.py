@@ -1,13 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 import os
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key='sk-proj-bKmMrLvoLMlazLgYwbIsT3BlbkFJxZpw40MFZntiEXZJqHuj')
 
 # Initialize the FastAPI app
 app = FastAPI()
 
 # Set your OpenAI API key from an environment variable for security
-openai.api_key = 'sk-proj-bKmMrLvoLMlazLgYwbIsT3BlbkFJxZpw40MFZntiEXZJqHuj'
 
 @app.post("/identify-lateral-flow-test/")
 async def identify_lateral_flow_test(file: UploadFile = File(...)):
@@ -18,11 +19,9 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             f.write(await file.read())
 
         # Upload the file to OpenAI
-        response = openai.File.create(
-            file=open(file_location, "rb"),
-            purpose='answers'
-        )
-        file_id = response['id']
+        response = client.files.create(file=open(file_location, "rb"),
+        purpose='answers')
+        file_id = response.id
 
         # Create a thread (if this is needed by your specific OpenAI API use case)
         thread_response = openai.Thread.create()
