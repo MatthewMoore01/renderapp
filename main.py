@@ -16,6 +16,7 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
         class EventHandler(AssistantEventHandler):
             def __init__(self):
                 self.result = ""
+                super().__init__()
 
             @override
             def on_text_created(self, text) -> None:
@@ -70,12 +71,12 @@ async def identify_lateral_flow_test(file: UploadFile = File(...)):
             ]
         )
 
-        with client.beta.threads.runs.stream(
-                thread_id=thread.id,
-                assistant_id='asst_zLWEETO02q3El9LXec4PfNJi',
-                event_handler=event_handler,
-        ) as stream:
-            stream.until_done()
+        # Run the thread with event handling
+        client.beta.threads.runs.stream(
+            thread_id=thread.id,
+            assistant_id='asst_zLWEETO02q3El9LXec4PfNJi',
+            event_handler=event_handler,
+        ).until_done()
 
         # Clean up the saved file
         os.remove(file_location)
